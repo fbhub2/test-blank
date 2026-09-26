@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Claude Task Scheduler</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header>
+  <h1>Claude Task Scheduler</h1>
+  <button id="key-btn" type="button">API key</button>
+</header>
+
+<main>
+  <section id="create-section">
+    <h2>New scheduled task</h2>
+    <form id="create-form">
+      <label>Name<input name="name" required maxlength="100" /></label>
+      <label>Prompt<textarea name="prompt" required rows="4"></textarea></label>
+      <label>Working directory (optional)<input name="workingDirectory" placeholder="C:\Users\you\project" /></label>
+      <label>Schedule
+        <select name="scheduleType" id="schedule-type">
+          <option value="Once">Once</option>
+          <option value="Daily">Daily</option>
+          <option value="Weekly">Weekly</option>
+          <option value="Interval">Every N minutes</option>
+        </select>
+      </label>
+
+      <div id="once-daily-fields" class="schedule-fields">
+        <label>Date<input type="date" name="date" /></label>
+        <label>Time<input type="time" name="time" required /></label>
+      </div>
+
+      <div id="weekly-fields" class="schedule-fields hidden">
+        <label>Days
+          <span class="days">
+            <label><input type="checkbox" name="days" value="MON" />Mon</label>
+            <label><input type="checkbox" name="days" value="TUE" />Tue</label>
+            <label><input type="checkbox" name="days" value="WED" />Wed</label>
+            <label><input type="checkbox" name="days" value="THU" />Thu</label>
+            <label><input type="checkbox" name="days" value="FRI" />Fri</label>
+            <label><input type="checkbox" name="days" value="SAT" />Sat</label>
+            <label><input type="checkbox" name="days" value="SUN" />Sun</label>
+          </span>
+        </label>
+      </div>
+
+      <div id="interval-fields" class="schedule-fields hidden">
+        <label>Every (minutes)<input type="number" name="intervalMinutes" min="1" max="1440" value="60" /></label>
+      </div>
+
+      <button type="submit">Create task</button>
+    </form>
+    <p id="create-error" class="error"></p>
+  </section>
+
+  <section id="list-section">
+    <h2>Scheduled tasks</h2>
+    <button id="refresh-btn" type="button">Refresh</button>
+    <ul id="task-list"></ul>
+  </section>
+
+  <section id="log-section" class="hidden">
+    <h2>Run log</h2>
+    <button id="close-log-btn" type="button">Close</button>
+    <pre id="log-output"></pre>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
