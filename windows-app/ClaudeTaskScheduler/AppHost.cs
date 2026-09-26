@@ -44,8 +44,12 @@ public sealed class AppHost
         BaseUrl = $"http://localhost:{settings.Port}/";
 
         // Fire-and-forget: Kestrel runs on its own threads while the WinForms
-        // message loop (Application.Run in Program.cs) owns this thread.
-        _ = app.RunAsync();
+        // message loop (Application.Run in Program.cs) owns this thread. A
+        // bind failure (e.g. the port already in use) would otherwise fail
+        // silently, so at least capture it to a log file.
+        _ = app.RunAsync().ContinueWith(
+            t => TryLogHostFailure(t.Exception),
+            TaskContinuationOptions.OnlyOnFaulted);
     }
 
     public async Task StopAsync()
@@ -53,6 +57,26 @@ public sealed class AppHost
         if (_app is not null)
         {
             await _app.StopAsync();
+        }
+    }
+
+    private static void TryLogHostFailure(Exception? exception)
+    {
+        if (exception is null)
+        {
+            return;
+        }
+
+        try
+        {
+            AppPaths.EnsureDirectories();
+            File.AppendAllText(
+                Path.Combine(AppPaths.RootDir, "host-error.log"),
+                $"{DateTime.UtcNow:o} {exception}{Environment.NewLine}");
+        }
+        catch (IOException)
+        {
+            // Best effort logging only.
         }
     }
 }

@@ -112,24 +112,32 @@ public sealed class WindowsTaskSchedulerService
             "/f",
         };
 
+        // schtasks /sd and /st are interpreted as the machine's local time, but
+        // StartTime arrives from the API as UTC (the browser sends an ISO
+        // string with a Z suffix) -- convert before formatting, or every task
+        // fires offset by the local UTC offset.
+        var localStartTime = task.StartTime.Kind == DateTimeKind.Utc
+            ? task.StartTime.ToLocalTime()
+            : task.StartTime;
+
         switch (task.ScheduleType)
         {
             case ScheduleType.Once:
                 args.AddRange(new[]
                 {
                     "/sc", "ONCE",
-                    "/sd", task.StartTime.ToString("MM/dd/yyyy"),
-                    "/st", task.StartTime.ToString("HH:mm"),
+                    "/sd", localStartTime.ToString("MM/dd/yyyy"),
+                    "/st", localStartTime.ToString("HH:mm"),
                 });
                 break;
 
             case ScheduleType.Daily:
-                args.AddRange(new[] { "/sc", "DAILY", "/st", task.StartTime.ToString("HH:mm") });
+                args.AddRange(new[] { "/sc", "DAILY", "/st", localStartTime.ToString("HH:mm") });
                 break;
 
             case ScheduleType.Weekly:
                 var days = task.DaysOfWeek.Where(d => ValidDays.Contains(d, StringComparer.OrdinalIgnoreCase));
-                args.AddRange(new[] { "/sc", "WEEKLY", "/d", string.Join(",", days), "/st", task.StartTime.ToString("HH:mm") });
+                args.AddRange(new[] { "/sc", "WEEKLY", "/d", string.Join(",", days), "/st", localStartTime.ToString("HH:mm") });
                 break;
 
             case ScheduleType.Interval:

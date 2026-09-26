@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using ClaudeTaskScheduler.Models;
 using ClaudeTaskScheduler.Services;
 
@@ -9,6 +10,13 @@ public static class TaskEndpoints
     {
         "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN",
     };
+
+    // WorkingDirectory is interpolated into a generated .cmd file (inside
+    // `cd /d "<path>"`). cmd.exe treats characters like & | < > ^ as command
+    // separators/redirections *even inside a quoted string*, so a plain
+    // quote-character check is not enough -- whitelist to a drive-rooted
+    // Windows path built only from characters that cmd.exe cannot reinterpret.
+    private static readonly Regex SafeWorkingDirectoryPattern = new(@"^[A-Za-z]:\\[A-Za-z0-9 ._\-\\]*$", RegexOptions.Compiled);
 
     public static void MapTaskEndpoints(this WebApplication app)
     {
@@ -60,7 +68,15 @@ public static class TaskEndpoints
                 return Results.NotFound();
             }
 
-            await scheduler.DeleteAsync(task);
+            try
+            {
+                await scheduler.DeleteAsync(task);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+
             store.Remove(id);
             return Results.NoContent();
         });
@@ -73,7 +89,15 @@ public static class TaskEndpoints
                 return Results.NotFound();
             }
 
-            await scheduler.RunNowAsync(task);
+            try
+            {
+                await scheduler.RunNowAsync(task);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+
             task.LastTriggeredUtc = DateTime.UtcNow;
             store.Update(task);
             return Results.Ok(task);
@@ -87,7 +111,15 @@ public static class TaskEndpoints
                 return Results.NotFound();
             }
 
-            await scheduler.SetEnabledAsync(task, body.Enabled);
+            try
+            {
+                await scheduler.SetEnabledAsync(task, body.Enabled);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            }
+
             task.Enabled = body.Enabled;
             store.Update(task);
             return Results.Ok(task);
@@ -126,9 +158,10 @@ public static class TaskEndpoints
         }
 
         if (!string.IsNullOrEmpty(request.WorkingDirectory) &&
-            (request.WorkingDirectory.Contains('"') || !Path.IsPathRooted(request.WorkingDirectory)))
+            (!Path.IsPathFullyQualified(request.WorkingDirectory) ||
+             !SafeWorkingDirectoryPattern.IsMatch(request.WorkingDirectory)))
         {
-            return "WorkingDirectory must be an absolute path and must not contain quote characters.";
+            return "WorkingDirectory must be an absolute Windows path (e.g. C:\\Users\\you\\project) using only letters, digits, spaces, '.', '-', '_', and backslashes.";
         }
 
         if (!Enum.TryParse<ScheduleType>(request.ScheduleType, ignoreCase: true, out var scheduleType))
